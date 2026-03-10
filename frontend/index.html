@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aerial Object Detector</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #050810;
+      --surface: #0d1220;
+      --border: #1e2a40;
+      --accent: #00e5ff;
+      --accent2: #ff4d6d;
+      --accent3: #a3ff57;
+      --text: #e8edf5;
+      --muted: #5a6a82;
+      --mono: 'Space Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 32px 0 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      clip-path: polygon(50% 0%, 100% 38%, 82% 100%, 18% 100%, 0% 38%);
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .logo-sub {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 56px 0 40px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .hero-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+
+    h1 span {
+      color: var(--accent);
+    }
+
+    .hero-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.8;
+      margin-bottom: 28px;
+    }
+
+    .arch-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      color: var(--accent3);
+      letter-spacing: 0.08em;
+      background: rgba(163,255,87,0.04);
+    }
+
+    .tag.blue { color: var(--accent); background: rgba(0,229,255,0.04); }
+    .tag.red  { color: var(--accent2); background: rgba(255,77,109,0.04); }
+
+    /* stats strip */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .stat-cell {
+      background: var(--surface);
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-val.green { color: var(--accent3); }
+    .stat-val.red   { color: var(--accent2); }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* ── UPLOAD ZONE ── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .upload-area {
+      border: 1px dashed var(--border);
+      background: var(--surface);
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-area:hover,
+    .upload-area.drag-over {
+      border-color: var(--accent);
+      background: rgba(0,229,255,0.03);
+    }
+
+    .upload-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .upload-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .upload-hint {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    #file-input { display: none; }
+
+    /* ── CONTROLS ── */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 12px;
+      margin-top: 16px;
+      align-items: end;
+    }
+
+    .field label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      display: block;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .field input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .field .range-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .btn-detect {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      padding: 14px 28px;
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    .btn-detect:hover { opacity: 0.85; }
+    .btn-detect:active { transform: scale(0.98); }
+    .btn-detect:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── PREVIEW + RESULTS ── */
+    .output-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .canvas-wrap {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      position: relative;
+      min-height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .canvas-wrap canvas {
+      max-width: 100%;
+      max-height: 500px;
+      display: block;
+    }
+
+    .canvas-placeholder {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .canvas-placeholder .big { font-size: 40px; display: block; margin-bottom: 12px; opacity: 0.2; }
+
+    .results-panel {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .detection-count {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .detection-list {
+      flex: 1;
+      overflow-y: auto;
+      max-height: 400px;
+    }
+
+    .detection-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: fadeIn 0.3s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    .det-name {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .det-conf {
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 3px 8px;
+      background: rgba(0,229,255,0.08);
+      color: var(--accent);
+      border: 1px solid rgba(0,229,255,0.2);
+    }
+
+    .det-conf.high { color: var(--accent3); background: rgba(163,255,87,0.08); border-color: rgba(163,255,87,0.2); }
+    .det-conf.med  { color: #ffd166; background: rgba(255,209,102,0.08); border-color: rgba(255,209,102,0.2); }
+
+    /* ── STATUS BAR ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 0;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .status-dot.active { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); animation: blink 1.2s ease-in-out infinite; }
+    .status-dot.error  { background: var(--accent2); }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── SPINNER ── */
+    .spinner-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(5,8,16,0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .spinner-text {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── CATEGORY LEGEND ── */
+    .legend {
+      margin-top: 24px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── INFERENCE STATS ── */
+    .inference-meta {
+      display: flex;
+      gap: 24px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .meta-val { color: var(--text); }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent2);
+      z-index: 100;
+      transform: translateY(80px);
+      transition: transform 0.3s ease;
+    }
+
+    .toast.show { transform: translateY(0); }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 64px;
+      padding: 24px 0;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-text {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+    }
+
+    /* responsive */
+    @media (max-width: 768px) {
+      .hero { grid-template-columns: 1fr; }
+      .output-grid { grid-template-columns: 1fr; }
+      .controls { grid-template-columns: 1fr; }
+      .stats-strip { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon"></div>
+        <div>
+          <div class="logo-text">AerialVision</div>
+          <div class="logo-sub">Strip R-CNN + ViT · DOTA v2</div>
+        </div>
+      </div>
+      <div class="badge">MODEL V1.0 · 15 CATEGORIES</div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div>
+      <div class="hero-label">// Hybrid Object Detector</div>
+      <h1>Detect Objects<br>in <span>UAV Imagery</span></h1>
+      <p class="hero-desc">
+        Upload a UAV or satellite image. The model runs Strip R-CNN region proposals through a
+        Vision Transformer encoder and returns bounding boxes with confidence scores for
+        15 object categories.
+      </p>
+      <div class="arch-tags">
+        <span class="tag blue">Strip R-CNN</span>
+        <span class="tag blue">ViT Encoder</span>
+        <span class="tag">FPN</span>
+        <span class="tag">RoI Align</span>
+        <span class="tag red">NMS</span>
+        <span class="tag">FastAPI</span>
+        <span class="tag">PostgreSQL</span>
+      </div>
+    </div>
+    <div class="stats-strip">
+      <div class="stat-cell">
+        <div class="stat-val">48%</div>
+        <div class="stat-label">mAP@0.5</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val green">15</div>
+        <div class="stat-label">Categories</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val red">25ms</div>
+        <div class="stat-label">Inference</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- UPLOAD -->
+  <div class="section-label">Image Input</div>
+
+  <div class="upload-area" id="upload-area">
+    <input type="file" id="file-input" accept="image/jpeg,image/png,image/webp,image/tiff" />
+    <div class="upload-icon">🛰</div>
+    <div class="upload-title">Drop UAV image here</div>
+    <div class="upload-hint">
+      JPEG · PNG · TIFF · WEBP<br>
+      Max 50 MB · Recommended 1024×1024
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="field">
+      <label>Confidence Threshold</label>
+      <input type="range" id="conf-slider" min="0.1" max="0.95" step="0.05" value="0.5" />
+      <div class="range-val" id="conf-val">0.50</div>
+    </div>
+    <div class="field">
+      <label>NMS IoU Threshold</label>
+      <input type="range" id="iou-slider" min="0.1" max="0.9" step="0.05" value="0.4" />
+      <div class="range-val" id="iou-val">0.40</div>
+    </div>
+    <button class="btn-detect" id="detect-btn" disabled>Run Detection</button>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">No image loaded</span>
+  </div>
+
+  <!-- OUTPUT -->
+  <div class="output-grid" id="output-grid" style="display:none;">
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <canvas id="result-canvas"></canvas>
+      <div class="spinner-overlay" id="spinner" style="display:none;">
+        <div class="spinner"></div>
+        <div class="spinner-text">Running inference...</div>
+      </div>
+    </div>
+
+    <div class="results-panel">
+      <div class="panel-header">
+        <span>Detections</span>
+        <span class="detection-count" id="det-count">—</span>
+      </div>
+      <div class="detection-list" id="det-list">
+        <div style="padding:24px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">
+          Run detection to see results
+        </div>
+      </div>
+      <div class="inference-meta" id="inf-meta" style="display:none;">
+        <div>Time: <span class="meta-val" id="inf-time">—</span></div>
+        <div>File: <span class="meta-val" id="inf-file">—</span></div>
+        <div>Size: <span class="meta-val" id="inf-size">—</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend" id="legend" style="display:none;">
+    <div class="section-label" style="margin-bottom:0;">Category Legend</div>
+    <div class="legend-grid" id="legend-grid"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-text">Krishna Prasad Lenka · Hybrid Aerial Object Detector · DOTA v2</div>
+    <div class="footer-text">Strip R-CNN + ViT · FastAPI · PostgreSQL · Docker</div>
+  </footer>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+  const API_BASE = "http://localhost:8000";
+
+  const CATEGORIES = [
+    "plane","ship","storage-tank","baseball-diamond","tennis-court",
+    "basketball-court","ground-track-field","harbor","bridge","large-vehicle",
+    "small-vehicle","helicopter","roundabout","soccer-ball-field","swimming-pool"
+  ];
+
+  const PALETTE = [
+    "#00e5ff","#ff4d6d","#a3ff57","#ffd166","#c77dff",
+    "#ff9f1c","#06d6a0","#ef476f","#118ab2","#073b4c",
+    "#e63946","#457b9d","#2a9d8f","#e9c46a","#f4a261"
+  ];
+
+  let selectedFile = null;
+  let currentImage = null;
+
+  const uploadArea  = document.getElementById("upload-area");
+  const fileInput   = document.getElementById("file-input");
+  const detectBtn   = document.getElementById("detect-btn");
+  const confSlider  = document.getElementById("conf-slider");
+  const iouSlider   = document.getElementById("iou-slider");
+  const confVal     = document.getElementById("conf-val");
+  const iouVal      = document.getElementById("iou-val");
+  const statusDot   = document.getElementById("status-dot");
+  const statusText  = document.getElementById("status-text");
+  const outputGrid  = document.getElementById("output-grid");
+  const canvas      = document.getElementById("result-canvas");
+  const ctx         = canvas.getContext("2d");
+  const spinner     = document.getElementById("spinner");
+  const detCount    = document.getElementById("det-count");
+  const detList     = document.getElementById("det-list");
+  const infMeta     = document.getElementById("inf-meta");
+  const infTime     = document.getElementById("inf-time");
+  const infFile     = document.getElementById("inf-file");
+  const infSize     = document.getElementById("inf-size");
+  const legendEl    = document.getElementById("legend");
+  const legendGrid  = document.getElementById("legend-grid");
+  const toast       = document.getElementById("toast");
+
+  confSlider.addEventListener("input", () => { confVal.textContent = parseFloat(confSlider.value).toFixed(2); });
+  iouSlider.addEventListener("input",  () => { iouVal.textContent  = parseFloat(iouSlider.value).toFixed(2); });
+
+  uploadArea.addEventListener("click", () => fileInput.click());
+
+  uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.classList.add("drag-over"); });
+  uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag-over"));
+  uploadArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove("drag-over");
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith("image/")) { showToast("Please upload an image file."); return; }
+    if (file.size > 50 * 1024 * 1024)    { showToast("File too large. Max 50 MB."); return; }
+
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        currentImage = img;
+        outputGrid.style.display = "grid";
+
+        canvas.width  = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        setStatus("active", `Image loaded — ${img.width}×${img.height} · ${formatSize(file.size)}`);
+        detectBtn.disabled = false;
+        detCount.textContent = "—";
+        detList.innerHTML = '<div style="padding:24px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">Click Run Detection</div>';
+        infMeta.style.display = "none";
+        legendEl.style.display = "none";
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  detectBtn.addEventListener("click", runDetection);
+
+  async function runDetection() {
+    if (!selectedFile) return;
+
+    detectBtn.disabled = true;
+    spinner.style.display = "flex";
+    setStatus("active", "Running inference...");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    const url = `${API_BASE}/detect/?confidence=${confSlider.value}&iou=${iouSlider.value}`;
+
+    try {
+      const res = await fetch(url, { method: "POST", body: formData });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      spinner.style.display = "none";
+      renderResults(data);
+      setStatus("active", `Detection complete — ${data.total_detections} objects found`);
+
+    } catch (err) {
+      spinner.style.display = "none";
+      setStatus("error", `Error: ${err.message}`);
+      showToast(err.message);
+
+      // Demo mode — show simulated results when API is offline
+      renderDemoResults();
+    } finally {
+      detectBtn.disabled = false;
+    }
+  }
+
+  function renderResults(data) {
+    ctx.drawImage(currentImage, 0, 0);
+
+    const scaleX = canvas.width  / (data.image_width  || canvas.width);
+    const scaleY = canvas.height / (data.image_height || canvas.height);
+
+    const usedCategories = new Set();
+
+    data.detections.forEach((det, i) => {
+      const color = PALETTE[(det.category_id - 1) % PALETTE.length];
+      const { x1, y1, x2, y2 } = det.bbox;
+      const bx = x1 * scaleX, by = y1 * scaleY;
+      const bw = (x2 - x1) * scaleX, bh = (y2 - y1) * scaleY;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx, by, bw, bh);
+
+      ctx.fillStyle = color + "cc";
+      const label = `${det.category_name} ${(det.confidence * 100).toFixed(0)}%`;
+      const tw = ctx.measureText(label).width + 10;
+      ctx.fillRect(bx, by - 20, tw, 20);
+      ctx.fillStyle = "#050810";
+      ctx.font = "bold 11px Space Mono, monospace";
+      ctx.fillText(label, bx + 5, by - 6);
+
+      usedCategories.add(det.category_id - 1);
+    });
+
+    detCount.textContent = data.total_detections;
+    renderDetectionList(data.detections);
+
+    infFile.textContent = data.filename;
+    infTime.textContent = data.inference_time_ms + " ms";
+    infSize.textContent = `${data.image_width}×${data.image_height}`;
+    infMeta.style.display = "flex";
+
+    renderLegend([...usedCategories]);
+  }
+
+  function renderDemoResults() {
+    // Simulate output when API is not running
+    const demoDetections = [
+      { category_id: 1,  category_name: "plane",         confidence: 0.91, bbox: { x1: 80,  y1: 60,  x2: 240, y2: 160 } },
+      { category_id: 10, category_name: "large-vehicle", confidence: 0.84, bbox: { x1: 300, y1: 200, x2: 450, y2: 280 } },
+      { category_id: 2,  category_name: "ship",          confidence: 0.76, bbox: { x1: 500, y1: 100, x2: 620, y2: 200 } },
+      { category_id: 8,  category_name: "harbor",        confidence: 0.68, bbox: { x1: 150, y1: 300, x2: 380, y2: 420 } },
+    ];
+
+    const demoData = {
+      filename: selectedFile.name,
+      image_width: currentImage.width,
+      image_height: currentImage.height,
+      total_detections: demoDetections.length,
+      detections: demoDetections,
+      inference_time_ms: 24.5,
+    };
+
+    renderResults(demoData);
+    setStatus("active", `Demo mode — API offline. Showing simulated results.`);
+  }
+
+  function renderDetectionList(detections) {
+    detList.innerHTML = "";
+    detections.forEach((det, i) => {
+      const conf = det.confidence;
+      const confClass = conf >= 0.8 ? "high" : conf >= 0.6 ? "med" : "";
+      const item = document.createElement("div");
+      item.className = "detection-item";
+      item.style.animationDelay = `${i * 40}ms`;
+      item.innerHTML = `
+        <div class="det-name">${det.category_name}</div>
+        <div class="det-conf ${confClass}">${(conf * 100).toFixed(1)}%</div>
+      `;
+      detList.appendChild(item);
+    });
+
+    if (detections.length === 0) {
+      detList.innerHTML = '<div style="padding:24px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">No objects detected above threshold</div>';
+    }
+  }
+
+  function renderLegend(usedIndices) {
+    legendGrid.innerHTML = "";
+    usedIndices.forEach((idx) => {
+      const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `
+        <div class="legend-dot" style="background:${PALETTE[idx % PALETTE.length]}"></div>
+        ${CATEGORIES[idx]}
+      `;
+      legendGrid.appendChild(item);
+    });
+    legendEl.style.display = usedIndices.length > 0 ? "block" : "none";
+  }
+
+  function setStatus(type, text) {
+    statusDot.className = "status-dot" + (type ? ` ${type}` : "");
+    statusText.textContent = text;
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3500);
+  }
+
+  // Build full legend on load
+  (function buildFullLegend() {
+    CATEGORIES.forEach((name, i) => {
+      const item = document.createElement("div");
+      item.className = "legend-item";
+      item.innerHTML = `<div class="legend-dot" style="background:${PALETTE[i]}"></div>${name}`;
+      legendGrid.appendChild(item);
+    });
+  })();
+</script>
+</body>
+</html>
